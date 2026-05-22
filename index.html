@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsidian Chess - Professional AI & Multiplayer</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PeerJS for P2P WebRTC -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <!-- Chess.js for strict move validation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Elegant Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <i class="fa-solid fa-chess-knight logo-icon"></i>
+                <div class="logo-text">
+                    <h1>Obsidian Chess</h1>
+                    <span>Tactical P2P & Engine AI</span>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="connection-badge status-disconnected" id="networkStatusBadge">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Offline Mode</span>
+                </div>
+                <button class="icon-btn" id="themeToggleBtn" title="Toggle Appearance">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace Grid -->
+        <main class="game-workspace">
+            <!-- Left Panel: Game Board Area -->
+            <section class="board-section">
+                <!-- Opponent Card -->
+                <div class="player-card opponent-card" id="opponentCard">
+                    <div class="player-info">
+                        <div class="avatar" id="opponentAvatar">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div>
+                            <h3 class="player-name" id="opponentName">Computer AI</h3>
+                            <p class="player-sub" id="opponentSub">Level 3: Intermediate (1600 ELO)</p>
+                        </div>
+                    </div>
+                    <div class="captured-dock" id="capturedByPlayer">
+                        <!-- Captured pieces of player (held by opponent) will appear here -->
+                    </div>
+                    <div class="timer hidden" id="opponentTimer">10:00</div>
+                </div>
+
+                <!-- Main Chess Board Wrapper -->
+                <div class="board-wrapper">
+                    <!-- Board Ranks (Left numbers) -->
+                    <div class="board-labels ranks"></div>
+                    <!-- The actual Chessboard -->
+                    <div class="chessboard" id="chessboard"></div>
+                    <!-- Board Files (Bottom letters) -->
+                    <div class="board-labels files"></div>
+
+                    <!-- WebGL/CSS Thinking Computer Overlay -->
+                    <div class="thinking-overlay hidden" id="thinkingOverlay">
+                        <div class="thinking-spinner">
+                            <i class="fa-solid fa-brain-circuit brain-icon"></i>
+                            <div class="glowing-ring"></div>
+                        </div>
+                        <span>Engine analyzing positions...</span>
+                    </div>
+                </div>
+
+                <!-- Player Card -->
+                <div class="player-card player-card" id="playerCard">
+                    <div class="player-info">
+                        <div class="avatar user-avatar">
+                            <i class="fa-solid fa-user-ninja"></i>
+                        </div>
+                        <div>
+                            <h3 class="player-name" id="playerName">Player 1</h3>
+                            <p class="player-sub" id="playerSub">Challenger</p>
+                        </div>
+                    </div>
+                    <div class="captured-dock" id="capturedByOpponent">
+                        <!-- Captured pieces of opponent (held by player) will appear here -->
+                    </div>
+                    <div class="timer hidden" id="playerTimer">10:00</div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Side Dashboard -->
+            <aside class="dashboard-section">
+                <!-- Tab Headers -->
+                <div class="dashboard-tabs">
+                    <button class="tab-btn active" data-tab="settings">
+                        <i class="fa-solid fa-sliders"></i> Match Settings
+                    </button>
+                    <button class="tab-btn" data-tab="history">
+                        <i class="fa-solid fa-list-ol"></i> Log
+                    </button>
+                    <button class="tab-btn hidden" id="chatTabHeader" data-tab="chat">
+                        <i class="fa-solid fa-comments"></i> Live Chat
+                    </button>
+                </div>
+
+                <!-- Tab Contents Container -->
+                <div class="tab-contents">
+                    <!-- Tab: Settings -->
+                    <div class="tab-content active" id="tab-settings">
+                        <!-- Mode Selector -->
+                        <div class="settings-card">
+                            <h3><i class="fa-solid fa-gamepad"></i> Game Mode</h3>
+                            <div class="mode-selector">
+                                <button class="mode-btn active" id="modeLocalBtn">
+                                    <i class="fa-solid fa-people-arrows"></i>
+                                    <span>Pass & Play</span>
+                                </button>
+                                <button class="mode-btn" id="modeAiBtn">
+                                    <i class="fa-solid fa-laptop-code"></i>
+                                    <span>Versus Engine</span>
+                                </button>
+                                <button class="mode-btn" id="modeOnlineBtn">
+                                    <i class="fa-solid fa-wifi"></i>
+                                    <span>Online P2P</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- AI Configuration (Only shown in AI Mode) -->
+                        <div class="settings-card hidden" id="aiConfigSection">
+                            <h3><i class="fa-solid fa-brain"></i> AI Difficulty</h3>
+                            <div class="difficulty-slider-container">
+                                <input type="range" min="1" max="5" value="3" class="diff-slider" id="difficultySlider">
+                                <div class="difficulty-info">
+                                    <span class="diff-title" id="diffTitle">Intermediate</span>
+                                    <span class="diff-elo" id="diffElo">1600 ELO</span>
+                                </div>
+                                <p class="diff-desc" id="diffDesc">Uses custom heuristic lookahead depth 4. Balanced strategy.</p>
+                            </div>
+                        </div>
+
+                        <!-- Matchmaking Actions (Only shown in Online Mode) -->
+                        <div class="settings-card hidden" id="onlineConfigSection">
+                            <h3><i class="fa-solid fa-link"></i> Peer-to-Peer Session</h3>
+                            <div class="online-actions">
+                                <button class="btn btn-primary" id="createRoomBtn">
+                                    <i class="fa-solid fa-circle-plus"></i> Host Online Game
+                                </button>
+                                <div class="room-share-box hidden" id="roomShareBox">
+                                    <p>Send this link to invite a friend:</p>
+                                    <div class="copy-input-group">
+                                        <input type="text" readonly id="roomLinkInput" value="">
+                                        <button class="copy-btn" id="copyLinkBtn" title="Copy Link">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <span class="copy-toast" id="copyToast">Link copied to clipboard!</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Customizations / Audio -->
+                        <div class="settings-card">
+                            <h3><i class="fa-solid fa-gears"></i> Customizations</h3>
+                            <div class="control-row">
+                                <label for="boardRotateBtn"><i class="fa-solid fa-arrows-rotate"></i> Flip Board</label>
+                                <button class="btn btn-secondary btn-sm" id="boardRotateBtn">
+                                    Rotate 180°
+                                </button>
+                            </div>
+                            <div class="control-row">
+                                <label for="soundToggleBtn"><i class="fa-solid fa-volume-high"></i> Game Sounds</label>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="soundToggleBtn" checked>
+                                    <span class="slider"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: History -->
+                    <div class="tab-content" id="tab-history">
+                        <div class="history-container">
+                            <div class="history-header">
+                                <span>Move Log</span>
+                                <span class="material-advantage" id="materialAdvantage">Even Material</span>
+                            </div>
+                            <div class="move-list" id="moveList">
+                                <div class="empty-state">No moves logged yet. Make a move to start the game!</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Chat -->
+                    <div class="tab-content" id="tab-chat">
+                        <div class="chat-container">
+                            <div class="chat-messages" id="chatMessages">
+                                <div class="system-message">Welcome to the P2P Match! Share the link to connect.</div>
+                            </div>
+                            <div class="chat-input-area">
+                                <input type="text" id="chatInput" placeholder="Type a message...">
+                                <button class="send-btn" id="sendChatBtn"><i class="fa-regular fa-paper-plane"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Action Sidebar Footer -->
+                <div class="action-footer">
+                    <button class="btn btn-secondary" id="undoBtn" disabled title="Undo Move">
+                        <i class="fa-solid fa-reply"></i> Undo Move
+                    </button>
+                    <button class="btn btn-danger" id="resetBtn" title="Restart Game">
+                        <i class="fa-solid fa-rotate-left"></i> Reset Match
+                    </button>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Floating Promotion Modal -->
+        <div class="modal-overlay hidden" id="promotionOverlay">
+            <div class="promotion-modal glass-card">
+                <h3>Select Promotion Piece</h3>
+                <div class="promotion-choices">
+                    <button class="promo-choice-btn" data-piece="q">
+                        <span class="promo-piece q"></span>
+                        <span class="promo-label">Queen</span>
+                    </button>
+                    <button class="promo-choice-btn" data-piece="r">
+                        <span class="promo-piece r"></span>
+                        <span class="promo-label">Rook</span>
+                    </button>
+                    <button class="promo-choice-btn" data-piece="b">
+                        <span class="promo-piece b"></span>
+                        <span class="promo-label">Bishop</span>
+                    </button>
+                    <button class="promo-choice-btn" data-piece="n">
+                        <span class="promo-piece n"></span>
+                        <span class="promo-label">Knight</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Game Over Modal -->
+        <div class="modal-overlay hidden" id="gameOverOverlay">
+            <div class="gameover-modal glass-card">
+                <div class="modal-crown">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+                <h2 id="gameOverTitle">Checkmate!</h2>
+                <p id="gameOverText">White wins the match by checkmate.</p>
+                <div class="gameover-stats">
+                    <div class="stat-box">
+                        <span class="stat-num" id="totalMovesCount">0</span>
+                        <span class="stat-label">Total Moves</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-num" id="gameDurationTime">0:00</span>
+                        <span class="stat-label">Duration</span>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" id="modalRematchBtn">Play Again</button>
+                    <button class="btn btn-secondary" id="modalCloseBtn">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script Entry Points (Classic Sequential Loading) -->
+    <script src="js/sounds.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/engine.js"></script>
+    <script src="js/multiplayer.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

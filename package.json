@@ -1,0 +1,23 @@
+{
+  "name": "obsidian-chess",
+  "version": "1.0.0",
+  "description": "Premium 2D Chess Web Application with engine AI and peer-to-peer multiplayer.",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server -p 8080 -c-1",
+    "dev": "npx http-server -p 8080 -c-1"
+  },
+  "keywords": [
+    "chess",
+    "p2p",
+    "webrtc",
+    "stockfish",
+    "minimax",
+    "es6-modules"
+  ],
+  "author": "Antigravity Pair Programmer",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
