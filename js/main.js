@@ -205,6 +205,24 @@ class ObsidianChessApp {
        ========================================================================== */
 
     openPromotionModal() {
+        const turnColor = this.chess.turn(); // 'w' or 'b'
+        const choices = {
+            q: turnColor + 'Q',
+            r: turnColor + 'R',
+            b: turnColor + 'B',
+            n: turnColor + 'N'
+        };
+        for (const [type, pieceKey] of Object.entries(choices)) {
+            const el = document.querySelector(`.promo-choice-btn[data-piece="${type}"] .promo-piece`);
+            if (el && window.PIECE_SVGS && window.PIECE_SVGS[pieceKey]) {
+                el.innerHTML = window.PIECE_SVGS[pieceKey];
+                const innerSvg = el.querySelector('svg');
+                if (innerSvg) {
+                    innerSvg.style.width = '100%';
+                    innerSvg.style.height = '100%';
+                }
+            }
+        }
         document.getElementById('promotionOverlay').classList.remove('hidden');
     }
 
@@ -271,7 +289,16 @@ class ObsidianChessApp {
                     el.style.height = '18px';
                     
                     const pieceKey = opponentColor + type.toUpperCase();
-                    el.innerHTML = `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">${this.getMiniSvgPath(pieceKey)}</svg>`;
+                    if (window.PIECE_SVGS && window.PIECE_SVGS[pieceKey]) {
+                        el.innerHTML = window.PIECE_SVGS[pieceKey];
+                        const innerSvg = el.querySelector('svg');
+                        if (innerSvg) {
+                            innerSvg.style.width = '100%';
+                            innerSvg.style.height = '100%';
+                        }
+                    } else {
+                        el.innerHTML = `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">${this.getMiniSvgPath(pieceKey)}</svg>`;
+                    }
                     dock.appendChild(el);
                 }
             });
