@@ -16,6 +16,11 @@ class ObsidianChessApp {
         this.aiColor = 'b';       // Computer color
         this.isAiThinking = false;
         
+        // P2P setup flag — suppresses network messages during initial handshake
+        this._isP2PSetup = false;
+        // P2P connection established flag
+        this._p2pConnected = false;
+        
         // Turn timers (10 minutes standard)
         this.timers = {
             w: 600,
@@ -609,10 +614,12 @@ class ObsidianChessApp {
         this.updateUndoButtonState();
         this.closeGameOverModal();
 
-        if (this.gameMode === 'online') {
+        // Only send reset request if we're in online mode AND it's NOT during
+        // the initial P2P handshake setup (which would cause a confirm dialog loop)
+        if (this.gameMode === 'online' && !this._isP2PSetup) {
             this.multiplayer.send({ type: 'RESET_REQUEST' });
             this.addSystemChatMessage("Requesting match restart...");
-        } else {
+        } else if (this.gameMode !== 'online') {
             if (window.sounds) window.sounds.playMove();
         }
     }
@@ -646,14 +653,17 @@ class ObsidianChessApp {
     }
 
     handleP2PConnection(isHost) {
+        this._p2pConnected = true;
         document.getElementById('chatTabHeader').classList.remove('hidden');
         this.addSystemChatMessage("Online connection secure. Chat enabled.");
+        
+        // Suppress outgoing reset/network messages during initial setup
+        this._isP2PSetup = true;
         
         if (isHost) {
             this.myColor = 'w';
             this.boardUI.setPerspective('w');
-            this.multiplayer.send({ type: 'COLOR_ASSIGN', color: 'b' });
-            this.addSystemChatMessage("Host designated as White. guest is Black.");
+            this.addSystemChatMessage("Host designated as White. Guest is Black.");
         } else {
             this.addSystemChatMessage("Waiting for color assignment...");
         }
@@ -662,6 +672,17 @@ class ObsidianChessApp {
         this.startTimerCountdown();
         this.updatePlayerCards();
         
+        // Re-enable setup flag so future resets work normally
+        this._isP2PSetup = false;
+        
+        // Now send color assignment AFTER the reset, so the guest receives it cleanly
+        if (isHost) {
+            this.multiplayer.send({ type: 'COLOR_ASSIGN', color: 'b' });
+        }
+        
+        // Enable board interactivity — host plays first (white)
+        this.boardUI.setInteractive(true);
+        
         document.getElementById('roomShareBox').classList.add('hidden');
     }
 
@@ -669,9 +690,12 @@ class ObsidianChessApp {
         switch (data.type) {
             case 'COLOR_ASSIGN':
                 this.myColor = data.color;
+                this.boardUI.playerColor = data.color;
                 this.boardUI.setPerspective(data.color);
                 this.addSystemChatMessage(`You play as ${data.color === 'w' ? 'White' : 'Black'}.`);
                 this.updatePlayerCards();
+                // Enable board interactivity now that color is assigned
+                this.boardUI.setInteractive(true);
                 break;
 
             case 'MOVE':
@@ -746,6 +770,7 @@ class ObsidianChessApp {
     }
 
     handleP2PDisconnect() {
+        this._p2pConnected = false;
         this.addSystemChatMessage("Opponent disconnected from session.");
         this.stopClocks();
         this.boardUI.setInteractive(false);
@@ -783,7 +808,10 @@ class ObsidianChessApp {
         const roomId = params.get('room');
         
         if (roomId) {
+            // Set mode with _isP2PSetup flag to prevent sending messages before connection
+            this._isP2PSetup = true;
             this.setGameMode('online');
+            this._isP2PSetup = false;
             
             this.setupMultiplayerManager();
             this.multiplayer.connectToHost(roomId);
@@ -792,6 +820,8 @@ class ObsidianChessApp {
             chatHeader.classList.remove('hidden');
             
             this.switchDashboardTab('chat');
+            
+            this.addSystemChatMessage('Connecting to host...');
         }
     }
 
